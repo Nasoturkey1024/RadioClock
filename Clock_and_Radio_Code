@@ -1,17 +1,21 @@
 from machine import Pin, I2C, Timer
 import time
+
 # Buttons for clock functionality
-enter/save_time = machine.Pin(0, machine.Pin.IN, machine.Pin.PULL_UP)
-Switch_time_12and24 = machine.Pin(1, machine.Pin.IN, machine.Pin.PULL_UP)
-enter/save_alarm = machine.Pin(2, machine.Pin.IN, machine.Pin.PULL_UP)
-turn_alarm_off/on = machine.Pin(3, machine.Pin.IN, machine.Pin.PULL_UP)
+
+enter_save_time = machine.Pin(0, machine.Pin.IN, machine.Pin.PULL_UP)
+switch_time_12and24 = machine.Pin(1, machine.Pin.IN, machine.Pin.PULL_UP)
+enter_save_alarm = machine.Pin(2, machine.Pin.IN, machine.Pin.PULL_UP)
+turn_alarm_off_on = machine.Pin(3, machine.Pin.IN, machine.Pin.PULL_UP)
 snooze = machine.Pin(4, machine.Pin.IN, machine.Pin.PULL_UP)
+
 # Universal buttons 
 value_increase = machine.Pin(5, machine.Pin.IN, machine.Pin.PULL_UP)
 value_decrease = machine.Pin(6, machine.Pin.IN, machine.Pin.PULL_UP)
 switch_display = machine.Pin(7, machine.Pin.IN, machine.Pin.PULL_UP)
 # Radio button/dial
-radio_on/off = machine.Pin(8, machine.Pin.IN, machine.Pin.PULL_UP)
+
+radio_on_off = machine.Pin(8, machine.Pin.IN, machine.Pin.PULL_UP)
 dial_button = machine.Pin(13, machine.Pin.IN, machine.Pin.PULL_UP)
 rotaryA = machine.Pin(15 machine.Pin.IN, machine.Pin.PULL_UP)
 rotaryB = machine.Pin(14, machine.Pin.IN, machine.Pin.PULL_UP)
@@ -20,28 +24,33 @@ rotaryB = machine.Pin(14, machine.Pin.IN, machine.Pin.PULL_UP)
 mode = 1
 # timer for use with debouncing
 tim = machine.Timer()
+clock_tim = machine.Timer()
 # timer for use with clock
 
 
 def change_mode(t):
-    if t > 4 or t < 1:
+    if t > 6 or t < 1:
         t = 1
     if t == 1: # clock mode
         mode = 1
-    else if t == 2: # edit clock mode
+    elif t == 2: # edit clock hour mode
         mode = 2
-    else if t == 3: # edit alarm mode
+    elif t == 3: # edit clock minute mode
         mode = 3
-    else: # radio mode
+    elif t == 4: # edit alarm hour mode
         mode = 4
+    elif t == 5: # edit alarm minute mode
+        mode = 5
+    else: # radio mode
+        mode = 6
 # increament value of volume/number depending on current mode
 def increament():
     if increament.value() == 0:
         if mode == 1:
+            
+        elif mode == 2:
         
-        else if mode == 2:
-        
-        else if mode == 3:
+        elif mode == 3:
     
         else:
             Settings = fm_radio.GetSettings()
@@ -54,39 +63,78 @@ def increament():
 # decreament value of volume/number depending on current mode 
 def decreament():
     if value_decrease.value() == 0:
-        if mode == 1:
+        if mode == 1:# clock mode
+
+        elif mode == 2: # edit clock hour
         
-        else if mode == 2:
+        elif mode == 3: # edit clock minute
         
-        else if mode == 3:
-        
-        else:
+        elif mode == 4: # edit alarm hour
+
+        elif mode == 5: # edit alarm minute
+
+        else: # radio mode
             Settings = fm_radio.GetSettings()
             Volume = Settings[1] - 1
-            if(Volume == 0):
+            if(Volume < 0):
                 Volume = 0
             if ( fm_radio.SetVolume( Volume ) == True ):
                 fm_radio.ProgramRadio()
-       
+
+def enter_save():
+    if enter_save_time.value() == 0:
+        if mode == 1 or mode == 6:
+            change_mode(2)
+        elif mode == 2:
+            change_mode(3)
+        elif mode == 3:
+            # save time here
+            change_mode(1)
+        else:
+            pass
+            
+def switch_display_time():
+    if clock.display == 0:
+        clock.display = 1
+    else:
+        clock.display
+
     
 # debounces universal increament
 def increament_debounce(t):
     tim.init(freq=50, mode=Timer.ONE_SHOT, callback=increament)
 def decreament_debounce(t):
     tim.init(freq=50, mode=Timer.ONE_SHOT, callback=decreament)
+def enter_save_time_debounce(t):
+    tim.init(freq=50, mode=Timer.ONE_SHOT, callback=enter_save)
+def switch_time_12and24_debounce(t):
+    tim.init(freq=50, mode=Timer.ONE_SHOT, callback=clock.change_display)
 
 
         
 value_increase.irq(trigger=machine.Pin.IRQ_Falling or machine.Pin.IRQ_Rising, handler=increament_debounce)
 value_decrease.irq(trigger=machine.Pin.IRQ_Falling or machine.Pin.IRQ_Rising, handler=decreament_debounce)
+enter_save_time.irq(trigger=machine.Pin.IRQ_Falling or machine.Pin.IRQ_Rising, handler=enter_save_time_debounce)
+
 
 class Clock:
     
-    def __init__(self, hour, minute, display):
+    def __init__(self, new_hour, new_minute, display_24):
         
         self.hour = 0 #
         self.minute = 0
-        self.display = 0 # sets clock as 12 hour time
+        self.display = False # sets clock as 12 hour time
+
+        self.sethour(new_hour)
+        self.setminute(new_minute)
+        self.setdisplay(display_24)
+
+    def change_display(self):
+        self.setdisplay(not(self.display))
+    def increament_minute(self):
+        self.setminute()
+
+        
 
 class Radio:
     
@@ -257,6 +305,7 @@ class Radio:
 # initialize the FM radio
 #
 fm_radio = Radio( 101.9, 2, False )
+clock = Clock()
 
 while ( True ):
 
@@ -341,6 +390,3 @@ while ( True ):
         
 
 
-
-    
-    
