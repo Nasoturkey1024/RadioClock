@@ -1,6 +1,7 @@
 # toDo
-# implement rotary encoder functionality
-# implement frequency search/confirm using rotary encoder
+# test encoder
+# implement clock volume/alarm sound
+# implement alarm functionallity
 # OLED Display
 from machine import Pin, I2C, Timer
 import time
@@ -11,17 +12,16 @@ enter_save_time = machine.Pin(0, machine.Pin.IN, machine.Pin.PULL_UP) # implemen
 switch_time_12and24 = machine.Pin(1, machine.Pin.IN, machine.Pin.PULL_UP) # implemented
 enter_save_alarm = machine.Pin(2, machine.Pin.IN, machine.Pin.PULL_UP) # implemented
 turn_alarm_off_on = machine.Pin(3, machine.Pin.IN, machine.Pin.PULL_UP) # implemented
-snooze = machine.Pin(4, machine.Pin.IN, machine.Pin.PULL_UP) # implemented
 
 # Universal buttons 
-value_increase = machine.Pin(5, machine.Pin.IN, machine.Pin.PULL_UP) # implemented, finish clock volume
+value_increase = machine.Pin(4, machine.Pin.IN, machine.Pin.PULL_UP) # implemented, finish clock volume
 value_decrease = machine.Pin(6, machine.Pin.IN, machine.Pin.PULL_UP) # implemented, finish clock volume
 switch_display = machine.Pin(7, machine.Pin.IN, machine.Pin.PULL_UP) # button implemented
 
 # Radio button/dial
 radio_on_off = machine.Pin(8, machine.Pin.IN, machine.Pin.PULL_UP) # implemented, needs testing
 dial_button = machine.Pin(13, machine.Pin.IN, machine.Pin.PULL_UP)
-rotaryA = machine.Pin(15 machine.Pin.IN, machine.Pin.PULL_UP)
+rotaryA = machine.Pin(15, machine.Pin.IN, machine.Pin.PULL_UP)
 rotaryB = machine.Pin(14, machine.Pin.IN, machine.Pin.PULL_UP)
 
 # mode decides what the universal increament/decreament do as well as display
@@ -30,6 +30,8 @@ mode = 1
 tim = machine.Timer()
 clock_tim = machine.Timer()
 # timer for use with clock
+past_A = rotaryA.value()
+past_B = rotaryB.value()
 
 # use this to change mode and implement changes that result from change
 def change_mode(t):
@@ -80,7 +82,7 @@ def increament():
         elif mode == 4: # edit alarm hour
             clock.increament_alarm_hour()
         elif mode == 5: # edit alarm minute
-            clock.increament_alarm_minute()
+            clock.increament_alarm_minute(1)
         else:
             Settings = fm_radio.GetSettings()
             Volume = Settings[1] + 1
@@ -134,7 +136,52 @@ def turn_radio_off_on():
         else:
             fm_radio.SetMute(False)
             fm_radio.ProgramRadio()
-    
+
+# function to increase/decrease frequency of radio based on rotation of rotary encoder
+def increase_place_holder():
+    fm_radio.increase_place_holder()
+def decrease_place_holder():
+    fm_radio.decrease_place_holder()
+def change_in_encoder():
+    if past_A == 0 and past_B == 0:
+        if rotaryA.value() == 1:
+            past_A = 1
+            increase_place_holder()
+        else:
+            past_B = 1
+            decrease_place_holder()
+    elif past_A == 1 and past_B == 0:
+        if rotaryB.value() == 1:
+            past_B = 1
+            increase_place_holder()
+        else:
+            past_A = 0
+            decrease_place_holder()
+    elif past_A == 0 and past_B == 1:
+        if rotaryB.value() == 0:
+            past_B = 0
+            increase_place_holder()
+        else:
+            past_A = 1
+            decrease_place_holder()
+    else:
+        if rotaryA.value() == 0:
+            past_A = 0
+            increase_place_holder()
+        else:
+            past_B = 0
+            decrease_place_holder()
+
+# function to set new frequency, also snooze due to mistake
+def set_new_frequency():
+    if dial_button.value == 0:
+        if clock.alarm_ringing == True:
+            clock.snooze()
+        else:
+            fm_radio.set_place_holder()
+def increase_timer(t):
+    clock.increase_minute()
+
 # debounces universal increament
 def increament_debounce(t):
     tim.init(freq=50, mode=Timer.ONE_SHOT, callback=increament)
@@ -154,23 +201,26 @@ def enter_alarm_edit_debounce(t):
     tim.init(freq=50, mode=Timer.ONE_SHOT, callback=enter_alarm_edit)
 def toggle_alarm_debounce(t):
     tim.init(freq=50, mode=Timer.ONE_SHOT, callback=toggle_alarm)
-def snooze_alarm_debounce(t):
-    tim.init(freq=50, mode=Timer.ONE_SHOT, callback=snooze_alarm)
 
 def toggle_radio_off_on_debounce(t):
     tim.init(freq=50, mode=Timer.ONE_SHOT, callback=turn_radio_off_on)
-
-# interrupt handlers for all buttons
-value_increase.irq(trigger=machine.Pin.IRQ_Falling or machine.Pin.IRQ_Rising, handler=increament_debounce)
-value_decrease.irq(trigger=machine.Pin.IRQ_Falling or machine.Pin.IRQ_Rising, handler=decreament_debounce)
-enter_save_time.irq(trigger=machine.Pin.IRQ_Falling or machine.Pin.IRQ_Rising, handler=enter_save_time_debounce)
-switch_time_12and24.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_Rising, handler=switch_time_12and24_debounce)
+def dial_button_debounce(t):
+    tim.init(freq=50, mode=Timer.ONE_SHOT, callback=set_new_frequency)
+def rotary_debounce(t):
+    tim.init(freq=200, mode=Timer.ONE_SHOT, callback=change_in_encoder)
+# interrupt handlers for all clock buttons
+value_increase.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_RISING, handler=increament_debounce)
+value_decrease.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_RISING, handler=decreament_debounce)
+enter_save_time.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_RISING, handler=enter_save_time_debounce)
+switch_time_12and24.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_RISING, handler=switch_time_12and24_debounce)
 switch_display.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_RISING, handler=switch_display_debounce)
 enter_save_alarm.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_RISING, handler=enter_alarm_edit_debounce)
 turn_alarm_off_on.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_RISING, handler=toggle_alarm_debounce)
-snooze.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_RISING, handler=snooze_alarm_debounce)
-
+# interrupt handler for radio buttons/encoders
 radio_on_off.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_RISING, handler=toggle_radio_off_on_debounce)
+dial_button.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_RISING, handler=dial_button_debounce)
+rotaryA.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_RISING, handler=rotary_debounce)
+rotaryB.irq()
 
 class Clock:
     
@@ -260,7 +310,8 @@ class Clock:
         else:
             self.minute = self.minute + 1
     # clock timer that increases minute every minute
-    clock_tim.init(period = 60, mode=Timer.PERIODIC, callback=increase_minute)
+    # does not work will this function
+    clock_tim.init(period = 60, mode=Timer.PERIODIC, callback=increase_timer)
 
 
         
@@ -275,7 +326,7 @@ class Radio:
         self.Volume = 2
         self.Frequency = 88
         self.Mute = False
-        
+        self.place_holder = 102
 #
 # Update the values with the ones passed in the initialization code
 #
@@ -328,7 +379,13 @@ class Radio:
         self.Volume = NewVolume
         return( True )
 
-
+    def increase_place_holder(self):
+        self.place_holder += 0.1
+    def decrease_place_holder(self):
+        self.place_holder -= 0.1
+    def set_place_holder(self):
+        if (self.SetFrequency(self.place_holder)) == True:
+            self.ProgramRadio()
 
     def SetFrequency( self, NewFrequency ):
 #
