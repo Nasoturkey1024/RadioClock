@@ -3,31 +3,31 @@ import time
 
 # Buttons for clock functionality
 
-enter_save_time = machine.Pin(0, machine.Pin.IN, machine.Pin.PULL_UP)
-switch_time_12and24 = machine.Pin(1, machine.Pin.IN, machine.Pin.PULL_UP)
-enter_save_alarm = machine.Pin(2, machine.Pin.IN, machine.Pin.PULL_UP)
-turn_alarm_off_on = machine.Pin(3, machine.Pin.IN, machine.Pin.PULL_UP)
-snooze = machine.Pin(4, machine.Pin.IN, machine.Pin.PULL_UP)
+enter_save_time = machine.Pin(0, machine.Pin.IN, machine.Pin.PULL_UP) # implemented
+switch_time_12and24 = machine.Pin(1, machine.Pin.IN, machine.Pin.PULL_UP) # implemented
+enter_save_alarm = machine.Pin(2, machine.Pin.IN, machine.Pin.PULL_UP) # implemented
+turn_alarm_off_on = machine.Pin(3, machine.Pin.IN, machine.Pin.PULL_UP) # implemented
+snooze = machine.Pin(4, machine.Pin.IN, machine.Pin.PULL_UP) # implemented
 
 # Universal buttons 
-value_increase = machine.Pin(5, machine.Pin.IN, machine.Pin.PULL_UP)
-value_decrease = machine.Pin(6, machine.Pin.IN, machine.Pin.PULL_UP)
-switch_display = machine.Pin(7, machine.Pin.IN, machine.Pin.PULL_UP)
-# Radio button/dial
+value_increase = machine.Pin(5, machine.Pin.IN, machine.Pin.PULL_UP) # implemented, finish clock volume
+value_decrease = machine.Pin(6, machine.Pin.IN, machine.Pin.PULL_UP) # implemented, finish clock volume
+switch_display = machine.Pin(7, machine.Pin.IN, machine.Pin.PULL_UP) 
 
-radio_on_off = machine.Pin(8, machine.Pin.IN, machine.Pin.PULL_UP)
+# Radio button/dial
+radio_on_off = machine.Pin(8, machine.Pin.IN, machine.Pin.PULL_UP) # implemented, needs testing
 dial_button = machine.Pin(13, machine.Pin.IN, machine.Pin.PULL_UP)
 rotaryA = machine.Pin(15 machine.Pin.IN, machine.Pin.PULL_UP)
 rotaryB = machine.Pin(14, machine.Pin.IN, machine.Pin.PULL_UP)
 
-# mode decides what the universal increament/decreament do
+# mode decides what the universal increament/decreament do as well as display
 mode = 1
 # timer for use with debouncing
 tim = machine.Timer()
 clock_tim = machine.Timer()
 # timer for use with clock
 
-
+# use this to change mode and implement changes that result from change
 def change_mode(t):
     if t > 6 or t < 1:
         t = 1
@@ -44,14 +44,39 @@ def change_mode(t):
     else: # radio mode
         mode = 6
 # increament value of volume/number depending on current mode
+def switch_clock_radio_display():
+    if switch_display.value() == 0:
+        if mode == 6:
+            change_mode(1)
+        else:
+            change_mode(6)
+# goes from hour->minute alarm edit
+def enter_alarm_edit():
+    if enter_save_alarm.value() == 0:
+        if mode == 4:
+            change_mode(5) # enter alarm minute
+        elif mode == 5:
+            change_mode(1) # exit alarm edit
+        else:
+            change_mode(4) # enter alarm hour
+def toggle_alarm():
+    if turn_alarm_off_on.value() == 0:
+        clock.toggle_alarm()
+def snooze_alarm():
+    if snooze.value() == 0:
+        clock.snooze()
 def increament():
     if increament.value() == 0:
-        if mode == 1:
-            
-        elif mode == 2:
-        
-        elif mode == 3:
-    
+        if mode == 1: # clock mode, 
+            clock.increament_volume()
+        elif mode == 2: # edit clock hour
+            clock.increament_hour()
+        elif mode == 3: # edit clock minute
+            clock.increament_minute()
+        elif mode == 4: # edit alarm hour
+            clock.increament_alarm_hour()
+        elif mode == 5: # edit alarm minute
+            clock.increament_alarm_minute()
         else:
             Settings = fm_radio.GetSettings()
             Volume = Settings[1] + 1
@@ -64,15 +89,15 @@ def increament():
 def decreament():
     if value_decrease.value() == 0:
         if mode == 1:# clock mode
-
+            clock.decreament_volume()
         elif mode == 2: # edit clock hour
-        
+            clock.decreament_hour()
         elif mode == 3: # edit clock minute
-        
+            clock.decreament_minute()
         elif mode == 4: # edit alarm hour
-
+            clock.decreament_alarm_hour()
         elif mode == 5: # edit alarm minute
-
+            clock.decreament_alarm_minute()
         else: # radio mode
             Settings = fm_radio.GetSettings()
             Volume = Settings[1] - 1
@@ -83,56 +108,156 @@ def decreament():
 
 def enter_save():
     if enter_save_time.value() == 0:
-        if mode == 1 or mode == 6:
-            change_mode(2)
-        elif mode == 2:
+        if mode == 2:
             change_mode(3)
         elif mode == 3:
-            # save time here
             change_mode(1)
         else:
-            pass
+            change_mode(2)
             
 def switch_display_time():
-    if clock.display == 0:
-        clock.display = 1
-    else:
-        clock.display
+    if switch_time_12and24.value() == 0:
+        if clock.display == 0:
+            clock.display = 1
+        else:
+            clock.display
 
+def turn_radio_off_on():
+    if radio_on_off.value == 0:
+        if fm_radio.Mute == False:
+            fm_radio.SetMute(True)
+            fm_radio.ProgramRadio()
+        else:
+            fm_radio.SetMute(False)
+            fm_radio.ProgramRadio()
     
 # debounces universal increament
 def increament_debounce(t):
     tim.init(freq=50, mode=Timer.ONE_SHOT, callback=increament)
+# debounces universal decreament
 def decreament_debounce(t):
     tim.init(freq=50, mode=Timer.ONE_SHOT, callback=decreament)
+# debounces enter/save time for clock
 def enter_save_time_debounce(t):
     tim.init(freq=50, mode=Timer.ONE_SHOT, callback=enter_save)
+
+# debounces for all clock buttons
 def switch_time_12and24_debounce(t):
     tim.init(freq=50, mode=Timer.ONE_SHOT, callback=clock.change_display)
+def switch_display_debounce(t):
+    tim.init(freq=50, mode=Timer.ONE_SHOT, callback=switch_clock_radio_display)
+def enter_alarm_edit_debounce(t):
+    tim.init(freq=50, mode=Timer.ONE_SHOT, callback=enter_alarm_edit)
+def toggle_alarm_debounce(t):
+    tim.init(freq=50, mode=Timer.ONE_SHOT, callback=toggle_alarm)
+def snooze_alarm_debounce(t):
+    tim.init(freq=50, mode=Timer.ONE_SHOT, callback=snooze_alarm)
 
+def toggle_radio_off_on_debounce(t):
+    tim.init(freq=50, mode=Timer.ONE_SHOT, callback=turn_radio_off_on)
 
-        
+# interrupt handlers for all buttons
 value_increase.irq(trigger=machine.Pin.IRQ_Falling or machine.Pin.IRQ_Rising, handler=increament_debounce)
 value_decrease.irq(trigger=machine.Pin.IRQ_Falling or machine.Pin.IRQ_Rising, handler=decreament_debounce)
 enter_save_time.irq(trigger=machine.Pin.IRQ_Falling or machine.Pin.IRQ_Rising, handler=enter_save_time_debounce)
+switch_time_12and24.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_Rising, handler=switch_time_12and24_debounce)
+switch_display.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_RISING, handler=switch_display_debounce)
+enter_save_alarm.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_RISING, handler=enter_alarm_edit_debounce)
+turn_alarm_off_on.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_RISING, handler=toggle_alarm_debounce)
+snooze.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_RISING, handler=snooze_alarm_debounce)
 
+radio_on_off.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_RISING, handler=toggle_radio_off_on_debounce)
 
 class Clock:
     
-    def __init__(self, new_hour, new_minute, display_24):
+    def __init__(self):
         
-        self.hour = 0 #
-        self.minute = 0
+        self.hour = 0 # current hour 
+        self.minute = 0 # current minute
         self.display = False # sets clock as 12 hour time
 
-        self.sethour(new_hour)
-        self.setminute(new_minute)
-        self.setdisplay(display_24)
+        self.alarm_hour = 7
+        self.alarm_minute = 30
+        self.alarm_volume = 10
+
+        self.alarm_set = False
+        self.alarm_ringing = False
 
     def change_display(self):
-        self.setdisplay(not(self.display))
+        self.display = not(self.display)
+    # increament and decreament hour for clock purposes
+    def increament_hour(self):
+        if self.hour >= 23:
+            self.hour = 0
+        else:
+            self.hour = self.hour + 1
+    def decreament_hour(self):
+        if self.hour <= 0:
+            self.hour = 23
+        else:
+            self.hour = self.hour - 1
+    # increament and decreament minute for clock purposes
     def increament_minute(self):
-        self.setminute()
+        if self.minute >= 59:
+            self.minute = 0
+        else:
+            self.minute = self.minute + 1
+    def decreament_minute(self):
+        if self.minute <= 0:
+            self.minute = 59
+        else:
+            self.minute = self.minute - 1
+    # increaments and decreaments hour for alarm
+    def increament_alarm_hour(self):
+        if self.alarm_hour == 23:
+            self.alarm_hour = 0
+        else:
+            self.alarm_hour = self.alarm_hour + 1
+    def decreament_alarm_hour(self):
+        if self.alarm_hour == 0:
+            self.alarm_hour = 23
+        else:
+            self.alarm_hour = self.alarm_hour - 1
+    # increaments alarm minute, has t variable for use of snooze button
+    def increament_alarm_minute(self, t):
+        if self.alarm_minute + t >= 60:
+            self.alarm_minute = self.alarm.minute + t - 60
+            self.increament_alarm_hour()
+        else:
+            self.alarm_minute = self.alarm_minute + t - 60
+    # decreaments alarm
+    def decreament_alarm_minute(self):
+        if self.alarm_minute <= 0:
+            self.alarm_minute = 59
+        else:
+            self.alarm_minute = self.alarm_minute - 1
+    # toggles alarm set/not set
+    def toggle_alarm(self):
+        if self.alarm_ringing == True:
+            self.alarm_ringing = False
+            self.alarm_set = False
+        else:
+            self.alarm_set = not(self.alarm_set)
+    # snoozes alarm if it is ringing
+    def snooze(self):
+        if self.alarm_ringing == True:
+            self.alarm_ringing = False
+            self.alarm
+    # keep simple until max/min values of volume discovered
+    def increament_volume(self):
+        self.volume += 1
+    def decreament_volume(self):
+        self.volume -= 1
+    # increament minute for clock timer only
+    def increase_minute(self):
+        if self.minute >= 59:
+            self.minute = 0
+            self.increament_hour()
+        else:
+            self.minute = self.minute + 1
+    # clock timer that increases minute every minute
+    clock_tim.init(period = 60, mode=Timer.PERIODIC, callback=increase_minute)
+
 
         
 
