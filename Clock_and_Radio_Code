@@ -1,3 +1,7 @@
+# toDo
+# implement rotary encoder functionality
+# implement frequency search/confirm using rotary encoder
+# OLED Display
 from machine import Pin, I2C, Timer
 import time
 
@@ -12,7 +16,7 @@ snooze = machine.Pin(4, machine.Pin.IN, machine.Pin.PULL_UP) # implemented
 # Universal buttons 
 value_increase = machine.Pin(5, machine.Pin.IN, machine.Pin.PULL_UP) # implemented, finish clock volume
 value_decrease = machine.Pin(6, machine.Pin.IN, machine.Pin.PULL_UP) # implemented, finish clock volume
-switch_display = machine.Pin(7, machine.Pin.IN, machine.Pin.PULL_UP) 
+switch_display = machine.Pin(7, machine.Pin.IN, machine.Pin.PULL_UP) # button implemented
 
 # Radio button/dial
 radio_on_off = machine.Pin(8, machine.Pin.IN, machine.Pin.PULL_UP) # implemented, needs testing
@@ -271,6 +275,7 @@ class Radio:
         self.Volume = 2
         self.Frequency = 88
         self.Mute = False
+        
 #
 # Update the values with the ones passed in the initialization code
 #
