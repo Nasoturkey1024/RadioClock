@@ -322,7 +322,7 @@ class Clock:
     def snooze(self):
         if self.alarm_ringing == True:
             self.alarm_ringing = False
-            self.alarm
+            self.increament_alarm_minute(5)
     # keep simple until max/min values of volume discovered
     def increament_volume(self):
         self.volume += 1
@@ -543,7 +543,7 @@ while ( True ):
                 oled.rect()
             else: # 12 hour
                 oled.text("%d:%d %s" % display_hour() % clock.minute % display_half(),,)
-            
+       '''     
     elif mode == 2: # edit hour
         if clock.display == True:
             if clock.alarm_set == True: # 24 hour, alarm set
@@ -608,6 +608,7 @@ while ( True ):
 
         oled.text("%f" % fm_radio.place_holder,,)
     oled.show()
+    '''
     print("")
     print( "ECE 299 FM Radio Demo Menu" );
     print("")
