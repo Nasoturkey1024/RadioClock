@@ -3,7 +3,8 @@
 # figure out how to work speaker for alarm purposes
 # implement clock volume/alarm sound
 # implement alarm functionallity
-# OLED Display
+# Rework OLED
+# create functions for display_hour, display_minute, display_am/pm
 from machine import Pin, I2C, Timer, SPI
 from ssd1306 import SSD1306_SPI
 import time
@@ -46,22 +47,42 @@ spi_cs  = Pin(17)
 
 SPI_DEVICE = 0
 oled_spi = SPI( SPI_DEVICE, baudrate= 100000, sck= spi_sck, mosi= spi_sda )
-oled = SSD1306_SPI( SCREEN_WIDTH, SCREEN_HEIGHT, oled_spi, spi_dc, spi_res, spi_cs, True )
+oled = SSD1306_SPI( screen_width, screen_height, oled_spi, spi_dc, spi_res, spi_cs, True )
+
+display_clock_hour = 0
+display_alarm_hour = 0
+display_time_half = ""
+display_alarm_half = ""
+
+
 # used when displaying 
-def display_hour():
-    if clock.display == False:
-        if clock.hour > 12:
-            return clock.hour - 12
-    elif clock.hour == 0
-        return 12
+def set_display_clock_hour():
+    if clock.hour == 0:
+        display_clock_hour = 12
+        display_time_half = "am"
+    elif clock.hour < 12:
+        display_clock_hour = clock.hour
+        display_time_half = "am"
+    elif clock.hour == 12:
+        display_clock_hour = 12
+        display_time_half = "pm"
     else:
-        return clock.hour
-# displays am or pm
-def display_half():
-    if clock.hour < 12:
-        return "am"
+        display_clock_hour = clock.hour - 12
+        display_time_half = "pm"
+def set_alarm_hour():
+    if clock.alarm_hour == 0:
+        display_alarm_hour = 12
+        display_alarm_half = "am"
+    elif clock.alarm_hour < 12:
+        display_alarm_hour = clock.alarm_hour
+        display_alarm_half = "am"
+    elif clock.alarm_hour == 12:
+        display_alarm_hour = 12
+        display_alarm_half = "pm"
     else:
-        return "pm"
+        display_alarm_hour = clock.alarm_hour - 12
+        display_alarm_half = "pm"
+
 # use this to change mode and implement changes that result from change
 def change_mode(t):
     if t > 6 or t < 1:
@@ -265,39 +286,46 @@ class Clock:
     # changes 24 and 12 hour clock display
     def change_display(self):
         self.display = not(self.display)
+        set_display_clock_hour()
     # increament and decreament hour for clock purposes
     def increament_hour(self):
         if self.hour >= 23:
             self.hour = 0
         else:
             self.hour = self.hour + 1
+        set_display_clock_hour()
     def decreament_hour(self):
         if self.hour <= 0:
             self.hour = 23
         else:
             self.hour = self.hour - 1
+        set_display_clock_hour()
     # increament and decreament minute for clock purposes
     def increament_minute(self):
         if self.minute >= 59:
             self.minute = 0
         else:
             self.minute = self.minute + 1
+        set_display_clock_hour()
     def decreament_minute(self):
         if self.minute <= 0:
             self.minute = 59
         else:
             self.minute = self.minute - 1
+        set_display_clock_hour()
     # increaments and decreaments hour for alarm
     def increament_alarm_hour(self):
         if self.alarm_hour == 23:
             self.alarm_hour = 0
         else:
             self.alarm_hour = self.alarm_hour + 1
+        set_alarm_hour()
     def decreament_alarm_hour(self):
         if self.alarm_hour == 0:
             self.alarm_hour = 23
         else:
             self.alarm_hour = self.alarm_hour - 1
+        set_alarm_hour()
     # increaments alarm minute, has t variable for use of snooze button
     def increament_alarm_minute(self, t):
         if self.alarm_minute + t >= 60:
@@ -305,24 +333,29 @@ class Clock:
             self.increament_alarm_hour()
         else:
             self.alarm_minute = self.alarm_minute + t
+        set_alarm_hour()
     # decreaments alarm
     def decreament_alarm_minute(self):
         if self.alarm_minute <= 0:
             self.alarm_minute = 59
         else:
             self.alarm_minute = self.alarm_minute - 1
+        set_alarm_hour()
     # toggles alarm set/not set
     def toggle_alarm(self):
         if self.alarm_ringing == True:
             self.alarm_ringing = False
             self.alarm_set = False
+            fm_radio.revert_alarm()
         else:
             self.alarm_set = not(self.alarm_set)
     # snoozes alarm if it is ringing
     def snooze(self):
         if self.alarm_ringing == True:
             self.alarm_ringing = False
+            fm_radio.revert_alarm()
             self.increament_alarm_minute(5)
+            set_alarm_hour()
     # keep simple until max/min values of volume discovered
     def increament_volume(self):
         self.volume += 1
@@ -335,9 +368,13 @@ class Clock:
             self.increament_hour()
         else:
             self.minute = self.minute + 1
+            set_display_clock_hour()
+        if self.hour == self.alarm_hour and self.minute == self.alarm_minute and self.alarm_set == True:
+            fm_radio.alarm()
+            self.alarm_ringing = True
     # clock timer that increases minute every minute
     # does not work will this function
-    clock_tim.init(period = 60, mode=Timer.PERIODIC, callback=increase_timer)
+    
 
 
         
@@ -353,6 +390,23 @@ class Radio:
         self.Frequency = 88
         self.Mute = False
         self.place_holder = 102
+
+        self.save_Frequency = 88
+        self.save_Volume = 2
+
+        def alarm():
+            self.save_Frequency = self.Frequency
+            self.save_Volume = self.Volume
+            self.SetVolume(clock.alarm_volume)
+            self.SetMute(False)
+            self.SetFrequency(88)
+
+        def revert_alarm():
+            self.SetMute(True)
+            self.SetVolume(self.save_Volume)
+            self.SetFrequency(self.save_Frequency)
+
+
 #
 # Update the values with the ones passed in the initialization code
 #
@@ -523,92 +577,86 @@ class Radio:
 #
 fm_radio = Radio( 101.9, 2, False )
 clock = Clock()
-
+clock_tim.init(period = 60, mode=Timer.PERIODIC, callback=increase_timer)
 while ( True ):
 
-    oled.fill(0) # clear buffer
-
+ # clear buffer
+    oled.fill(0)
 
     # display on OLED, need to test using OLED
-    if mode == 1: # clock
+    if clock.alarm_ringing == True:
+        oled.text("ALARMING", ,)
+    elif mode == 1: # clock
         if clock.display == True:
             if clock.alarm_set == True: # 24 hour, alarm set
-                oled.text("%d:%d" % display_hour() % clock.minute ,,)
+                oled.text("%d:%d" % (clock.hour, clock.minute) ,,)
                 oled.rect()
             else: # 24 hour
-                oled.text("%d:%d" % display_hour() % clock.minute ,,)
+                oled.text("%d:%d" % (clock.hour, clock.minute) ,,)
         else: 
             if clock.alarm_set == True: # 12 hour, alarm set
-                oled.text("%d:%d %s" % display_hour() % clock.minute % display_half(),,)
+                oled.text("%d:%d %s" % (display_clock_hour, clock.minute, display_time_half),,)
                 oled.rect()
             else: # 12 hour
-                oled.text("%d:%d %s" % display_hour() % clock.minute % display_half(),,)
-       '''     
+                oled.text("%d:%d %s" % (display_clock_hour, clock.minute, display_time_half),,)
+            
     elif mode == 2: # edit hour
         if clock.display == True:
             if clock.alarm_set == True: # 24 hour, alarm set
-                oled.text("%d:%d" % display_hour() % clock.minute ,,)
-                oled.rect()
-                oled.rect()
+                oled.text("%d:%d" % (clock.hour, clock.minute) ,,)
             else: # 24 hour
-                oled.text("%d:%d" % display_hour() % clock.minute ,,)
+                oled.text("%d:%d" % (clock.hour, clock.minute) ,,)
                 oled.rect()
         else: 
             if clock.alarm_set == True: # 12 hour, alarm set
-                oled.text("%d:%d %s" % display_hour() % clock.minute % display_half(),,)
-                oled.rect()
-                oled.rect()
+                oled.text("%d:%d %s" % (display_clock_hour, clock.minute, display_time_half),,)
             else: # 12 hour
-                oled.text("%d:%d %s" % display_hour() % clock.minute % display_half(),,)
+                oled.text("%d:%d %s" % (display_clock_hour, clock.minute, display_time_half),,)
                 oled.rect()
     elif mode == 3: # edit minute
         if clock.display == True:
             if clock.alarm_set == True: # 24 hour, alarm set
-                oled.text("%d:%d" % display_hour() % clock.minute ,,)
-                oled.rect()
-                oled.rect()
+                oled.text("%d:%d" % (clock.hour, clock.minute) ,,)
             else: # 24 hour
-                oled.text("%d:%d" % display_hour() % clock.minute ,,)
+                oled.text("%d:%d" % (clock.hour, clock.minute) ,,)
         else: 
             if clock.alarm_set == True: # 12 hour, alarm set
-                oled.text("%d:%d %s" % display_hour() % clock.minute % display_half(),,)
-                oled.rect()
-                oled.rect()
+                oled.text("%d:%d %s" % (display_clock_hour, clock.minute, display_time_half),,)
             else: # 12 hour
-                oled.text("%d:%d %s" % display_hour() % clock.minute % display_half(),,)
+                oled.text("%d:%d %s" % (display_clock_hour, clock.minute, display_time_half),,)
                 oled.rect()
     elif mode == 4: # edit alarm hour
         if clock.display == True:
             if clock.alarm_set == True: # 24 hour, alarm set
-                oled.text("%d:%d" % display_hour() % clock.minute ,,)
+                oled.text("%d:%d" % (clock.alarm_hour, clock.alarm_minute) ,,)
                 oled.fill_rect()
             else: # 24 hour
-                oled.text("%d:%d" % display_hour() % clock.minute ,,)
+                oled.text("%d:%d" % (clock.alarm_hour, clock.alarm_minute) ,,)
         else: 
             if clock.alarm_set == True: # 12 hour, alarm set
-                oled.text("%d:%d %s" % display_hour() % clock.minute % display_half(),,)
+                oled.text("%d:%d %s" % (display_alarm_hour, clock.minute, display_alarm_half),,)
                 oled.rect()
             else: # 12 hour
-                oled.text("%d:%d %s" % display_hour() % clock.minute % display_half(),,)
+                oled.text("%d:%d %s" % (display_alarm_hour, clock.minute, display_alarm_half),,)
     elif mode == 5: # edit alarm minute
         if clock.display == True:
             if clock.alarm_set == True: # 24 hour, alarm set
-                oled.text("%d:%d" % display_hour() % clock.minute ,,)
+                oled.text("%d:%d" % (clock.alarm_hour, clock.alarm_minute) ,,)
                 oled.rect()
             else: # 24 hour
-                oled.text("%d:%d" % display_hour() % clock.minute ,,)
+                oled.text("%d:%d" % (clock.alarm_hour, clock.alarm_minute) ,,)
         else: 
             if clock.alarm_set == True: # 12 hour, alarm set
-                oled.text("%d:%d %s" % display_hour() % clock.minute % display_half(),,)
+                oled.text("%d:%d %s" % (display_alarm_hour, clock.minute, display_alarm_half),,)
                 oled.rect()
             else: # 12 hour
-                oled.text("%d:%d %s" % display_hour() % clock.minute % display_half(),,)
+                oled.text("%d:%d %s" % (display_alarm_hour, clock.minute, display_alarm_half),,)
     else: # radio mode
         oled.text("%s %f" % "FM" % fm_radio.Frequency,,)
 
         oled.text("%f" % fm_radio.place_holder,,)
     oled.show()
-    '''
+    
     print("")
     print( "ECE 299 FM Radio Demo Menu" );
     print("")
