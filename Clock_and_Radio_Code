@@ -1,29 +1,34 @@
-# toDo
-# test encoder
-# figure out how to work speaker for alarm purposes
-# implement clock volume/alarm sound
-# implement alarm functionallity
-# Rework OLED
-# create functions for display_hour, display_minute, display_am/pm
 from machine import Pin, I2C, Timer, SPI
 from ssd1306 import SSD1306_SPI
 import time
+# todo
+# implement rotary encoder
+# solder speaker and test
 
 # Buttons for clock functionality
 
-enter_save_time = machine.Pin(0, machine.Pin.IN, machine.Pin.PULL_UP) # implemented
-switch_time_12and24 = machine.Pin(1, machine.Pin.IN, machine.Pin.PULL_UP) # implemented
-enter_save_alarm = machine.Pin(2, machine.Pin.IN, machine.Pin.PULL_UP) # implemented
-turn_alarm_off_on = machine.Pin(3, machine.Pin.IN, machine.Pin.PULL_UP) # implemented
+# button 1, enters/exits time editing
+enter_save_time = machine.Pin(0, machine.Pin.IN, machine.Pin.PULL_UP) # Tested
+# button 4?, switches 12 hour and 24 hour display
+switch_time_12and24 = machine.Pin(1, machine.Pin.IN, machine.Pin.PULL_UP) # tested
+# button 5, enters/exits alarm editing
+enter_save_alarm = machine.Pin(2, machine.Pin.IN, machine.Pin.PULL_UP) # tested
+# button 6, sets/un-sets alarm and turns off if ringing
+turn_alarm_off_on = machine.Pin(3, machine.Pin.IN, machine.Pin.PULL_UP) # tested
 
-# Universal buttons 
-value_increase = machine.Pin(4, machine.Pin.IN, machine.Pin.PULL_UP) # implemented, finish clock volume
-value_decrease = machine.Pin(6, machine.Pin.IN, machine.Pin.PULL_UP) # implemented, finish clock volume
-switch_display = machine.Pin(7, machine.Pin.IN, machine.Pin.PULL_UP) # button implemented
+# Universal buttons
+# button 7, universal increase depending on mode
+value_increase = machine.Pin(4, machine.Pin.IN, machine.Pin.PULL_UP) # tested
+# button 2, Universal decrease depending on mode
+value_decrease = machine.Pin(6, machine.Pin.IN, machine.Pin.PULL_UP) # tested
+# button 3, switches between clock and radio display
+switch_display = machine.Pin(7, machine.Pin.IN, machine.Pin.PULL_UP) # tested
 
 # Radio button/dial
-radio_on_off = machine.Pin(8, machine.Pin.IN, machine.Pin.PULL_UP) # implemented, needs testing
-dial_button = machine.Pin(13, machine.Pin.IN, machine.Pin.PULL_UP)
+# button 8, mutes/un-mutes radio
+radio_on_off = machine.Pin(8, machine.Pin.IN, machine.Pin.PULL_UP) # tested
+# snoozes alarm/ saves frequency
+dial_button = machine.Pin(12, machine.Pin.IN, machine.Pin.PULL_UP)
 rotaryA = machine.Pin(15, machine.Pin.IN, machine.Pin.PULL_UP)
 rotaryB = machine.Pin(14, machine.Pin.IN, machine.Pin.PULL_UP)
 
@@ -34,7 +39,6 @@ tim = machine.Timer()
 clock_tim = machine.Timer()
 # timer for use with clock
 past_A = rotaryA.value()
-past_B = rotaryB.value()
 
 screen_width = 128 # number of columns
 screen_height = 64 # number of rows
@@ -49,117 +53,43 @@ SPI_DEVICE = 0
 oled_spi = SPI( SPI_DEVICE, baudrate= 100000, sck= spi_sck, mosi= spi_sda )
 oled = SSD1306_SPI( screen_width, screen_height, oled_spi, spi_dc, spi_res, spi_cs, True )
 
-display_clock_hour = 0
-display_alarm_hour = 0
-display_time_half = ""
-display_alarm_half = ""
-
-
-# used when displaying 
-def set_display_clock_hour():
+display_hour = 12
+display_half = "AM"
+display_alarm_hour = 7
+display_alarm_half = "AM"
+# updates clock display for 12 hour clock
+def update_display_time():
+    global display_hour, display_half
     if clock.hour == 0:
-        display_clock_hour = 12
-        display_time_half = "am"
+        display_hour = 12
+        display_half = "AM"
     elif clock.hour < 12:
-        display_clock_hour = clock.hour
-        display_time_half = "am"
+        display_hour = clock.hour
+        display_half = "AM"
     elif clock.hour == 12:
-        display_clock_hour = 12
-        display_time_half = "pm"
+        display_hour = 12
+        display_half = "PM"
     else:
-        display_clock_hour = clock.hour - 12
-        display_time_half = "pm"
-def set_alarm_hour():
+        display_hour = clock.hour - 12
+        display_half = "PM"
+# updates the alarm display for 12 hour clock
+def display_alarm():
+    global display_alarm_hour, display_alarm_half
     if clock.alarm_hour == 0:
         display_alarm_hour = 12
-        display_alarm_half = "am"
+        display_alarm_half = "AM"
     elif clock.alarm_hour < 12:
-        display_alarm_hour = clock.alarm_hour
-        display_alarm_half = "am"
+        display_alarm_hour = clock.alarm_hour 
+        display_alarm_half = "AM"
     elif clock.alarm_hour == 12:
         display_alarm_hour = 12
-        display_alarm_half = "pm"
+        display_alarm_half = "PM"
     else:
         display_alarm_hour = clock.alarm_hour - 12
-        display_alarm_half = "pm"
-
-# use this to change mode and implement changes that result from change
-def change_mode(t):
-    if t > 6 or t < 1:
-        t = 1
-    if t == 1: # clock mode
-        mode = 1
-    elif t == 2: # edit clock hour mode
-        mode = 2
-    elif t == 3: # edit clock minute mode
-        mode = 3
-    elif t == 4: # edit alarm hour mode
-        mode = 4
-    elif t == 5: # edit alarm minute mode
-        mode = 5
-    else: # radio mode
-        mode = 6
-# increament value of volume/number depending on current mode
-def switch_clock_radio_display():
-    if switch_display.value() == 0:
-        if mode == 6:
-            change_mode(1)
-        else:
-            change_mode(6)
-# goes from hour->minute alarm edit
-def enter_alarm_edit():
-    if enter_save_alarm.value() == 0:
-        if mode == 4:
-            change_mode(5) # enter alarm minute
-        elif mode == 5:
-            change_mode(1) # exit alarm edit
-        else:
-            change_mode(4) # enter alarm hour
-def toggle_alarm():
-    if turn_alarm_off_on.value() == 0:
-        clock.toggle_alarm()
-def increament():
-    if increament.value() == 0:
-        if mode == 1: # clock mode, 
-            clock.increament_volume()
-        elif mode == 2: # edit clock hour
-            clock.increament_hour()
-        elif mode == 3: # edit clock minute
-            clock.increament_minute()
-        elif mode == 4: # edit alarm hour
-            clock.increament_alarm_hour()
-        elif mode == 5: # edit alarm minute
-            clock.increament_alarm_minute(1)
-        else:
-            Settings = fm_radio.GetSettings()
-            Volume = Settings[1] + 1
-            if(Volume == 16):
-                Volume = 15
-            if ( fm_radio.SetVolume( Volume ) == True ):
-                fm_radio.ProgramRadio()
-       
-# decreament value of volume/number depending on current mode 
-def decreament():
-    if value_decrease.value() == 0:
-        if mode == 1:# clock mode
-            clock.decreament_volume()
-        elif mode == 2: # edit clock hour
-            clock.decreament_hour()
-        elif mode == 3: # edit clock minute
-            clock.decreament_minute()
-        elif mode == 4: # edit alarm hour
-            clock.decreament_alarm_hour()
-        elif mode == 5: # edit alarm minute
-            clock.decreament_alarm_minute()
-        else: # radio mode
-            Settings = fm_radio.GetSettings()
-            Volume = Settings[1] - 1
-            if(Volume < 0):
-                Volume = 0
-            if ( fm_radio.SetVolume( Volume ) == True ):
-                fm_radio.ProgramRadio()
-
-def enter_save():
+        display_alarm_half = "PM"
+# enters/exits edit clock hour/minute
+def enter_save(t):
+    global mode
     if enter_save_time.value() == 0:
         if mode == 2:
             change_mode(3)
@@ -167,69 +97,335 @@ def enter_save():
             change_mode(1)
         else:
             change_mode(2)
-            
-def switch_display_time():
-    if switch_time_12and24.value() == 0:
-        if clock.display == 0:
-            clock.display = 1
+# changes mode and updates OLED display
+def change_mode(t):
+    global mode
+    if t > 7 or t < 1:
+        t = 1
+    if t == 1: # clock mode
+        mode = 1
+        oled.fill(0)
+        if clock.display == False:
+            oled.text("{:0=2} : {:0=2} {}".format(display_hour, clock.minute, display_half), 28, 32)
+            if clock.alarm_set == True:
+                oled.text("Alarm {:0=2} : {:0=2} {}".format(display_alarm_hour, clock.alarm_minute, display_alarm_half),0,10)
         else:
-            clock.display
-
-def turn_radio_off_on():
-    if radio_on_off.value == 0:
-        if fm_radio.Mute == False:
-            fm_radio.SetMute(True)
-            fm_radio.ProgramRadio()
+            oled.text("{:0=2} : {:0=2}".format(clock.hour, clock.minute),39,32)
+            if clock.alarm_set == True:
+                oled.text("Alarm {:0=2} : {:0=2}".format(clock.alarm_hour, clock.alarm_minute),0,10)
+        oled.text("Alarm Volume {:0=2}".format(fm_radio.alarm_volume), 4, 56)
+        oled.show()
+    elif t == 2: # edit clock hour mode
+        mode = 2
+        if clock.display == False:
+            oled.fill(0)
+            oled.text("Set Hour",35,0)
+            oled.text("{:0=2} {}".format(display_hour, display_half), 45, 9)
+            oled.text("{:0=2} : {:0=2} {}".format(display_hour, clock.minute, display_half),28,32)
         else:
-            fm_radio.SetMute(False)
-            fm_radio.ProgramRadio()
-
-# function to increase/decrease frequency of radio based on rotation of rotary encoder
-def increase_place_holder():
-    fm_radio.increase_place_holder()
-def decrease_place_holder():
-    fm_radio.decrease_place_holder()
-def change_in_encoder():
-    if past_A == 0 and past_B == 0:
-        if rotaryA.value() == 1:
-            past_A = 1
-            increase_place_holder()
+            oled.fill(0)
+            oled.text("Set Hour",35,0)
+            oled.text("{:0=2}".format(clock.hour), 56, 9)
+            oled.text("{:0=2} : {:0=2}".format(clock.hour, clock.minute),39,32)
+        oled.show()
+    elif t == 3: # edit clock minute mode
+        mode = 3
+        if clock.display == False:
+            oled.fill(0)
+            oled.text("Set Minute",25,0)
+            oled.text("{:0=2}".format(clock.minute), 56, 9)
+            oled.text("{:0=2} : {:0=2} {}".format(display_hour, clock.minute, display_half),28,32)
         else:
-            past_B = 1
-            decrease_place_holder()
-    elif past_A == 1 and past_B == 0:
-        if rotaryB.value() == 1:
-            past_B = 1
-            increase_place_holder()
+            oled.fill(0)
+            oled.text("Set Minute",25,0)
+            oled.text("{:0=2}".format(clock.minute), 56, 9)
+            oled.text("{:0=2} : {:0=2}".format(clock.hour, clock.minute),39,32)
+        oled.show()
+    elif t == 4: # edit alarm hour mode
+        mode = 4
+        if clock.display == False:
+            oled.fill(0)
+            oled.text("Set Alarm Hour",10,0)
+            oled.text("{:0=2} {}".format(display_alarm_hour, display_alarm_half), 42, 9)
+            oled.text("{:0=2} : {:0=2} {}".format(display_hour, clock.minute, display_half),28,32)
         else:
-            past_A = 0
-            decrease_place_holder()
-    elif past_A == 0 and past_B == 1:
-        if rotaryB.value() == 0:
-            past_B = 0
-            increase_place_holder()
+            oled.fill(0)
+            oled.text("Set Alarm Hour",10,0)
+            oled.text("{:0=2}".format(clock.alarm_hour), 58, 9)
+            oled.text("{:0=2} : {:0=2}".format(clock.hour, clock.minute),39,32)
+        oled.show()
+    elif t == 5: # edit alarm minute mode
+        mode = 5
+        if clock.display == False:
+            oled.fill(0)
+            oled.text("Set Alarm Minute",0,0)
+            oled.text("{:0=2}".format(clock.alarm_minute), 55, 9)
+            oled.text("{:0=2} : {:0=2} {}".format(display_hour, clock.minute, display_half),28,32)
         else:
-            past_A = 1
-            decrease_place_holder()
+            oled.fill(0)
+            oled.text("Set Alarm Minute",0,0)
+            oled.text("{:0=2}".format(clock.alarm_minute), 55, 9)
+            oled.text("{:0=2} : {:0=2}".format(clock.hour, clock.minute),35,32)
+        oled.show()
+    elif t == 6: # radio mode
+        mode = 6
+        oled.fill(0)
+        oled.text("Set Frequency",15,0)
+        oled.text("%.1f" % (fm_radio.whole_frequency + fm_radio.decimal_frequency/10), 45, 9)
+        oled.text("%.1f MHz" % fm_radio.Frequency, 35, 32)
+        oled.text(" Volume: {:0=2}".format(fm_radio.Volume),20 ,56)
+        oled.show()
     else:
-        if rotaryA.value() == 0:
-            past_A = 0
-            increase_place_holder()
+        mode = 7
+        oled.fill(0)
+        oled.text("ALARMING!!!", 25, 32)
+        oled.show()
+# changes display from 12 hour to 24 hour and vice versa     
+def change_display(t):
+    if switch_time_12and24.value() == 0:
+        clock.change_display()
+# enters modes that allow editing of alarm
+def enter_alarm_edit(t):
+    global mode
+    if enter_save_alarm.value() == 0:
+        if mode == 4:
+            change_mode(5)
+        elif mode == 5:
+            change_mode(1)
         else:
-            past_B = 0
-            decrease_place_holder()
-
-# function to set new frequency, also snooze due to mistake
-def set_new_frequency():
-    if dial_button.value == 0:
+            change_mode(4)
+# switches between clock and radio mode
+def switch_clock_radio_display(t):
+    global mode
+    if switch_display.value() == 0:
+        if mode == 6:
+            change_mode(1)
+        else:
+            change_mode(6)
+# sets/unsets alarm
+def toggle_alarm(t):
+    if turn_alarm_off_on.value() == 0:
+        clock.toggle_alarm()
+# toggles mute of radio   
+def turn_radio_on_off(t):
+    if radio_on_off.value() == 0:
+        fm_radio.toggle_mute()
+# _increaments multiple values depending on current mode
+def increament(t):
+    global mode
+    if value_increase.value() == 0: # clock mode
+        if mode == 1:
+            if fm_radio.alarm_volume == 15:
+                fm_radio.alarm_volume = 15
+            else:
+                fm_radio.alarm_volume += 1
+            change_mode(1)
+        elif mode == 2: # edit hour
+            clock.increament_hour()
+        elif mode == 3: # edit minute
+            clock.increament_minute()
+        elif mode == 4: # edit alarm hour
+            clock.increament_alarm_hour()
+        elif mode == 5: # edit alarm minute
+            clock.increament_alarm_minute(1)
+        elif mode == 6: # radio mode
+            if fm_radio.Volume >= 15:
+                fm_radio.SetVolume(15)
+            else:
+                fm_radio.SetVolume(fm_radio.Volume + 1)
+            change_mode(6)
+            fm_radio.ProgramRadio()
+# decreaments multiple values depending on current mode
+def decreament(t):
+    global mode
+    if value_decrease.value() == 0:
+        if mode == 1: # clock
+            if fm_radio.alarm_volume <= 0:
+                fm_radio.SetVolume(0)
+            else:
+                fm_radio.alarm_volume -= 1
+                change_mode(1)          
+        elif mode == 2: # edit hour
+            clock.decreament_hour()
+        elif mode == 3: # edit minute
+            clock.decreament_minute()
+        elif mode == 4: # edit alarm hour
+            clock.decreament_alarm_hour()
+        elif mode == 5: # edit alarm minute
+            clock.decreament_alarm_minute()
+        elif mode == 6: # radio
+            if fm_radio.Volume <= 0:
+                fm_radio.SetVolume(0)
+            else:
+                fm_radio.SetVolume(fm_radio.Volume - 1)
+            change_mode(6)
+            fm_radio.ProgramRadio()
+# sets placeholder frequency as current frequency    
+def set_new_frequency(t):
+    global mode
+    if dial_button.value() == 0:
         if clock.alarm_ringing == True:
             clock.snooze()
         else:
             fm_radio.set_place_holder()
-def increase_timer(t):
+            if mode == 6:
+                change_mode(6)
+# increases/decreases placeholder frequency depending on rotation
+def change_in_encoder(t): # 11 -> 01 -> 00 -> 10 -> 11 - > 01
+    global mode, past_A, past_B
+    if past_A == rotaryB.value():
+        fm_radio.decrease_place_holder()
+        past_A = rotaryA.value()
+    else:
+        fm_radio.increase_place_holder()
+    past_A = rotaryA.value()
+    if mode == 6:
+        change_mode(6)
+    
+# called by clock_timer to increament minute each minute
+def periodic_increase(t):
     clock.increase_minute()
+            
+class Clock:
+    global mode
+    def __init__(self):
+        
+        self.hour = 0 # current hour 
+        self.minute = 0 # current minute
+        self.display = False # sets clock as 12 hour time by default
 
-# debounces universal increament
+        self.alarm_hour = 7
+        self.alarm_minute = 30
+
+        self.alarm_set = False
+        self.alarm_ringing = False
+        
+    # changes 24 and 12 hour clock display
+    def change_display(self): # tested
+        self.display = not(self.display)
+        if mode == 1:
+            change_mode(1)
+        elif mode == 2:
+            change_mode(2)
+        elif mode == 3:
+            change_mode(3)
+        elif mode == 4:
+            change_mode(4)
+        elif mode == 5:
+            change_mode(5)
+    # increament hour for clock purposes
+    def increament_hour(self): # tested
+        if self.hour >= 23:
+            self.hour = 0
+        else:
+            self.hour = self.hour + 1
+        update_display_time()
+        change_mode(2)
+    # decreament hour for clock purposes
+    def decreament_hour(self): # tested
+        if self.hour <= 0:
+            self.hour = 23
+        else:
+            self.hour = self.hour - 1
+        update_display_time()
+        change_mode(2)
+    # increament minute for clock purposes
+    def increament_minute(self): # tested
+        if self.minute >= 59:
+            self.minute = 0
+        else:
+            self.minute = self.minute + 1
+        update_display_time()
+        change_mode(3)
+    # decreament minute for clock purposes
+    def decreament_minute(self): # tested
+        if self.minute <= 0:
+            self.minute = 59
+        else:
+            self.minute = self.minute - 1
+        update_display_time()
+        change_mode(3)
+    # increaments hour for alarm
+    def increament_alarm_hour(self): # tested
+        if self.alarm_hour == 23:
+            self.alarm_hour = 0
+        else:
+            self.alarm_hour = self.alarm_hour + 1
+        display_alarm()
+        change_mode(4)
+    # decreaments hour for alarm
+    def decreament_alarm_hour(self): # tested
+        if self.alarm_hour <= 0:
+            self.alarm_hour = 23
+        else:
+            self.alarm_hour = self.alarm_hour - 1
+        display_alarm()
+        change_mode(4)
+    # increaments alarm minute, has t variable for use of snooze button
+    def increament_alarm_minute(self, t): # tested
+        if self.alarm_minute + t >= 60:
+            self.alarm_minute = self.alarm_minute + t - 60
+            if t == 10: # only increaments alarm hour if snooze is used
+                self.increament_alarm_hour()
+        else:
+            self.alarm_minute = self.alarm_minute + t
+        display_alarm()
+        if t == 1:
+            change_mode(5)
+    # decreaments alarm minute
+    def decreament_alarm_minute(self): # tested
+        if self.alarm_minute <= 0:
+            self.alarm_minute = 59
+        else:
+            self.alarm_minute = self.alarm_minute - 1
+        display_alarm()
+        change_mode(5)
+    # toggles alarm set/not set
+    def toggle_alarm(self): # tested
+        if self.alarm_ringing == True:
+            self.alarm_ringing = False
+            fm_radio.stop_alarm()
+            change_mode(1)
+        else:
+            self.alarm_set = not(self.alarm_set)
+            if mode == 1:
+                change_mode(1)
+    # snoozes alarm if it is ringing
+    def snooze(self): # tested
+        if self.alarm_ringing == True:
+            self.alarm_ringing = False
+            fm_radio.stop_alarm()
+            self.increament_alarm_minute(10)
+            change_mode(1)
+            
+    # increament hour for clock timer only
+    def increase_hour(self):
+        if self.hour >= 23:
+            self.hour = 0
+        else:
+            self.hour += 1
+    # increaments clock minute for clock timer only, is able to increase clock hour
+    def increase_minute(self): # tested
+        if self.minute >= 59:
+            self.minute = 0
+            self.increase_hour()
+        else:
+            self.minute = self.minute + 1
+        if self.hour == self.alarm_hour and self.minute == self.alarm_minute and self.alarm_set == True:
+            self.alarm_ringing = True
+            fm_radio.play_alarm()
+            change_mode(7)
+        elif mode == 1:
+            change_mode(1)
+        elif mode == 2:
+            change_mode(2)
+        elif mode == 3:
+            change_mode(3)
+        elif mode == 4:
+            change_mode(4)
+        elif mode == 5:
+            change_mode(5)
+            
 def increament_debounce(t):
     tim.init(freq=50, mode=Timer.ONE_SHOT, callback=increament)
 # debounces universal decreament
@@ -241,7 +437,7 @@ def enter_save_time_debounce(t):
 
 # debounces for all clock buttons
 def switch_time_12and24_debounce(t):
-    tim.init(freq=50, mode=Timer.ONE_SHOT, callback=clock.change_display)
+    tim.init(freq=50, mode=Timer.ONE_SHOT, callback=change_display)
 def switch_display_debounce(t):
     tim.init(freq=50, mode=Timer.ONE_SHOT, callback=switch_clock_radio_display)
 def enter_alarm_edit_debounce(t):
@@ -250,11 +446,11 @@ def toggle_alarm_debounce(t):
     tim.init(freq=50, mode=Timer.ONE_SHOT, callback=toggle_alarm)
 
 def toggle_radio_off_on_debounce(t):
-    tim.init(freq=50, mode=Timer.ONE_SHOT, callback=turn_radio_off_on)
+    tim.init(freq=50, mode=Timer.ONE_SHOT, callback=turn_radio_on_off)
 def dial_button_debounce(t):
     tim.init(freq=50, mode=Timer.ONE_SHOT, callback=set_new_frequency)
 def rotary_debounce(t):
-    tim.init(freq=200, mode=Timer.ONE_SHOT, callback=change_in_encoder)
+    tim.init(freq=400, mode=Timer.ONE_SHOT, callback=change_in_encoder)
 # interrupt handlers for all clock buttons
 value_increase.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_RISING, handler=increament_debounce)
 value_decrease.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_RISING, handler=decreament_debounce)
@@ -267,117 +463,6 @@ turn_alarm_off_on.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_RISING,
 radio_on_off.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_RISING, handler=toggle_radio_off_on_debounce)
 dial_button.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_RISING, handler=dial_button_debounce)
 rotaryA.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_RISING, handler=rotary_debounce)
-rotaryB.irq(trigger=machine.Pin.IRQ_FALLING or machine.Pin.IRQ_RISING, handler=rotary_debounce)
-
-class Clock:
-    
-    def __init__(self):
-        
-        self.hour = 0 # current hour 
-        self.minute = 0 # current minute
-        self.display = False # sets clock as 12 hour time by default
-
-        self.alarm_hour = 7
-        self.alarm_minute = 30
-        self.alarm_volume = 10
-
-        self.alarm_set = False
-        self.alarm_ringing = False
-    # changes 24 and 12 hour clock display
-    def change_display(self):
-        self.display = not(self.display)
-        set_display_clock_hour()
-    # increament and decreament hour for clock purposes
-    def increament_hour(self):
-        if self.hour >= 23:
-            self.hour = 0
-        else:
-            self.hour = self.hour + 1
-        set_display_clock_hour()
-    def decreament_hour(self):
-        if self.hour <= 0:
-            self.hour = 23
-        else:
-            self.hour = self.hour - 1
-        set_display_clock_hour()
-    # increament and decreament minute for clock purposes
-    def increament_minute(self):
-        if self.minute >= 59:
-            self.minute = 0
-        else:
-            self.minute = self.minute + 1
-        set_display_clock_hour()
-    def decreament_minute(self):
-        if self.minute <= 0:
-            self.minute = 59
-        else:
-            self.minute = self.minute - 1
-        set_display_clock_hour()
-    # increaments and decreaments hour for alarm
-    def increament_alarm_hour(self):
-        if self.alarm_hour == 23:
-            self.alarm_hour = 0
-        else:
-            self.alarm_hour = self.alarm_hour + 1
-        set_alarm_hour()
-    def decreament_alarm_hour(self):
-        if self.alarm_hour == 0:
-            self.alarm_hour = 23
-        else:
-            self.alarm_hour = self.alarm_hour - 1
-        set_alarm_hour()
-    # increaments alarm minute, has t variable for use of snooze button
-    def increament_alarm_minute(self, t):
-        if self.alarm_minute + t >= 60:
-            self.alarm_minute = self.alarm.minute + t - 60
-            self.increament_alarm_hour()
-        else:
-            self.alarm_minute = self.alarm_minute + t
-        set_alarm_hour()
-    # decreaments alarm
-    def decreament_alarm_minute(self):
-        if self.alarm_minute <= 0:
-            self.alarm_minute = 59
-        else:
-            self.alarm_minute = self.alarm_minute - 1
-        set_alarm_hour()
-    # toggles alarm set/not set
-    def toggle_alarm(self):
-        if self.alarm_ringing == True:
-            self.alarm_ringing = False
-            self.alarm_set = False
-            fm_radio.revert_alarm()
-        else:
-            self.alarm_set = not(self.alarm_set)
-    # snoozes alarm if it is ringing
-    def snooze(self):
-        if self.alarm_ringing == True:
-            self.alarm_ringing = False
-            fm_radio.revert_alarm()
-            self.increament_alarm_minute(5)
-            set_alarm_hour()
-    # keep simple until max/min values of volume discovered
-    def increament_volume(self):
-        self.volume += 1
-    def decreament_volume(self):
-        self.volume -= 1
-    # increament minute for clock timer only
-    def increase_minute(self):
-        if self.minute >= 59:
-            self.minute = 0
-            self.increament_hour()
-        else:
-            self.minute = self.minute + 1
-            set_display_clock_hour()
-        if self.hour == self.alarm_hour and self.minute == self.alarm_minute and self.alarm_set == True:
-            fm_radio.alarm()
-            self.alarm_ringing = True
-    # clock timer that increases minute every minute
-    # does not work will this function
-    
-
-
-        
 
 class Radio:
     
@@ -385,29 +470,21 @@ class Radio:
 
 #
 # set the initial values of the radio
-#
+        # Basic radio parameters
         self.Volume = 2
         self.Frequency = 88
         self.Mute = False
-        self.place_holder = 102
+        # used to calculate frequency when set
+        self.whole_frequency = 88
+        self.decimal_frequency = 0
+        # alarm values
+        self.alarm_volume = 10
+        self.alarm_frequency = 88
+        # saved values for when alarm is played so previous settings can be reverted
+        self.save_volume = 2
+        self.save_frequency = 88
+        # stops what is playing and switches to designated alarm radio
 
-        self.save_Frequency = 88
-        self.save_Volume = 2
-
-        def alarm():
-            self.save_Frequency = self.Frequency
-            self.save_Volume = self.Volume
-            self.SetVolume(clock.alarm_volume)
-            self.SetMute(False)
-            self.SetFrequency(88)
-
-        def revert_alarm():
-            self.SetMute(True)
-            self.SetVolume(self.save_Volume)
-            self.SetFrequency(self.save_Frequency)
-
-
-#
 # Update the values with the ones passed in the initialization code
 #
         self.SetVolume( NewVolume )
@@ -431,12 +508,38 @@ class Radio:
 #
 # Array used to configure the radio
 #
-        self.Settings = bytearray( 8 )
+        self.Settings = bytearray( 12 )
 
 
         self.radio_i2c = I2C( self.i2c_device, scl=self.i2c_scl, sda=self.i2c_sda, freq=200000)
         self.ProgramRadio()
-
+    # stops radio and plays alarm instead
+    def play_alarm(self):
+        self.save_volume = self.Volume
+        self.save_frequency = self.Frequency
+            
+        self.SetMute(False)
+        self.SetVolume(self.alarm_volume)
+        self.SetFrequency(self.alarm_frequency)
+        self.ProgramRadio()
+        # reverts changes after alarm is stopped
+    # stops alarm and reverts radio settings
+    def stop_alarm(self):
+        self.SetVolume(self.save_volume)
+        self.SetFrequency(self.save_frequency)
+        self.SetMute(True)
+            
+        self.ProgramRadio()
+    # toggles mute of radio, if alarm ringing then stops alarm
+    def toggle_mute(self):
+        if clock.alarm_ringing == True:
+            self.stop_alarm()
+            clock.alarm_ringing = False
+            change_mode(1)
+        else:
+            self.SetMute(not(self.Mute))
+            self.ProgramRadio()
+            
     def SetVolume( self, NewVolume ):
 #
 # Conver t the string into a integer
@@ -458,17 +561,29 @@ class Radio:
 
         self.Volume = NewVolume
         return( True )
-
+    # increases placeholder_ frequency
     def increase_place_holder(self):
-        self.place_holder += 0.1
-        if self.place_holder > 107.3:
-            self.place_holder = 107.3
+        if self.whole_frequency == 108:
+            self.whole_frequency = 108
+            self.decimal_frequency = 0
+        elif self.decimal_frequency >= 9:
+            self.decimal_frequency = 0
+            self.whole_frequency += 1
+        else:
+            self.decimal_frequency += 1
+    # decreases placeholder frequency
     def decrease_place_holder(self):
-        self.place_holder -= 0.1
-        if self.place_holder < 88.0:
-            self.place_holder = 88.0
+        if self.whole_frequency <= 88:
+            self.whole_frequecy = 88
+            self.decimal_frequency = 0
+        elif self.decimal_frequency <= 0:
+            self.decimal_frequency = 9
+            self.whole_frequency -= 1
+        else:
+            self.decimal_frequency -= 1
+    # sets current placeholder frequency as real frequency
     def set_place_holder(self):
-        if (self.SetFrequency(self.place_holder)) == True:
+        if (self.SetFrequency(self.whole_frequency + self.decimal_frequency/10)) == True:
             self.ProgramRadio()
 
     def SetFrequency( self, NewFrequency ):
@@ -533,6 +648,11 @@ class Radio:
         self.Settings[5] = 0x00
         self.Settings[6] = 0x84
         self.Settings[7] = 0x80 + self.Volume
+        # Hunter was here. Thank you for the code fix, Hunter
+        self.Settings[8] = 0x00
+        self.Settings[9] = 0x00
+        self.Settings[10] = 0x42
+        self.Settings[11] = 0x02
 
 #        
 # Update the settings array and transmitt it to the radio
@@ -572,165 +692,12 @@ class Radio:
         
         return( MuteStatus, VolumeStatus, FrequencyStatus, StereoStatus )
 
-#
-# initialize the FM radio
-#
-fm_radio = Radio( 101.9, 2, False )
 clock = Clock()
-clock_tim.init(period = 60, mode=Timer.PERIODIC, callback=increase_timer)
-while ( True ):
-
- # clear buffer
-    oled.fill(0)
-
-    # display on OLED, need to test using OLED
-    if clock.alarm_ringing == True:
-        oled.text("ALARMING", ,)
-    elif mode == 1: # clock
-        if clock.display == True:
-            if clock.alarm_set == True: # 24 hour, alarm set
-                oled.text("%d:%d" % (clock.hour, clock.minute) ,,)
-                oled.rect()
-            else: # 24 hour
-                oled.text("%d:%d" % (clock.hour, clock.minute) ,,)
-        else: 
-            if clock.alarm_set == True: # 12 hour, alarm set
-                oled.text("%d:%d %s" % (display_clock_hour, clock.minute, display_time_half),,)
-                oled.rect()
-            else: # 12 hour
-                oled.text("%d:%d %s" % (display_clock_hour, clock.minute, display_time_half),,)
-            
-    elif mode == 2: # edit hour
-        if clock.display == True:
-            if clock.alarm_set == True: # 24 hour, alarm set
-                oled.text("%d:%d" % (clock.hour, clock.minute) ,,)
-            else: # 24 hour
-                oled.text("%d:%d" % (clock.hour, clock.minute) ,,)
-                oled.rect()
-        else: 
-            if clock.alarm_set == True: # 12 hour, alarm set
-                oled.text("%d:%d %s" % (display_clock_hour, clock.minute, display_time_half),,)
-            else: # 12 hour
-                oled.text("%d:%d %s" % (display_clock_hour, clock.minute, display_time_half),,)
-                oled.rect()
-    elif mode == 3: # edit minute
-        if clock.display == True:
-            if clock.alarm_set == True: # 24 hour, alarm set
-                oled.text("%d:%d" % (clock.hour, clock.minute) ,,)
-            else: # 24 hour
-                oled.text("%d:%d" % (clock.hour, clock.minute) ,,)
-        else: 
-            if clock.alarm_set == True: # 12 hour, alarm set
-                oled.text("%d:%d %s" % (display_clock_hour, clock.minute, display_time_half),,)
-            else: # 12 hour
-                oled.text("%d:%d %s" % (display_clock_hour, clock.minute, display_time_half),,)
-                oled.rect()
-    elif mode == 4: # edit alarm hour
-        if clock.display == True:
-            if clock.alarm_set == True: # 24 hour, alarm set
-                oled.text("%d:%d" % (clock.alarm_hour, clock.alarm_minute) ,,)
-                oled.fill_rect()
-            else: # 24 hour
-                oled.text("%d:%d" % (clock.alarm_hour, clock.alarm_minute) ,,)
-        else: 
-            if clock.alarm_set == True: # 12 hour, alarm set
-                oled.text("%d:%d %s" % (display_alarm_hour, clock.minute, display_alarm_half),,)
-                oled.rect()
-            else: # 12 hour
-                oled.text("%d:%d %s" % (display_alarm_hour, clock.minute, display_alarm_half),,)
-    elif mode == 5: # edit alarm minute
-        if clock.display == True:
-            if clock.alarm_set == True: # 24 hour, alarm set
-                oled.text("%d:%d" % (clock.alarm_hour, clock.alarm_minute) ,,)
-                oled.rect()
-            else: # 24 hour
-                oled.text("%d:%d" % (clock.alarm_hour, clock.alarm_minute) ,,)
-        else: 
-            if clock.alarm_set == True: # 12 hour, alarm set
-                oled.text("%d:%d %s" % (display_alarm_hour, clock.minute, display_alarm_half),,)
-                oled.rect()
-            else: # 12 hour
-                oled.text("%d:%d %s" % (display_alarm_hour, clock.minute, display_alarm_half),,)
-    else: # radio mode
-        oled.text("%s %f" % "FM" % fm_radio.Frequency,,)
-
-        oled.text("%f" % fm_radio.place_holder,,)
-    oled.show()
-    
-    print("")
-    print( "ECE 299 FM Radio Demo Menu" );
-    print("")
-    print( "1 - change radio frequency" )
-    print( "2 - change volume level" )
-    print( "3 - mute audio" )
-    print( "4 - read current settings" )
-    
-    select = input( "Enter menu number > " )
-
-#
-# Set radio frequency
-#
-    if ( select == "1" ):
-        Frequency = input( "Enter frequncy in Mhz ( IE 100.3 ) > " )
-
-        if ( fm_radio.SetFrequency( Frequency ) == True ):
-            fm_radio.ProgramRadio()
-        else:
-            print( "Invalid frequency( Range is 88.0 to 108.0 )" )
-
-#
-# Set volume level of radio
-#
-    elif ( select == "2" ):
-        Volume = input( "Enter volume level ( 0 to 15, 15 is loud ) > " )
-        
-        if ( fm_radio.SetVolume( Volume ) == True ):
-            fm_radio.ProgramRadio()
-        else:
-            print( "Invalid volume level( Range is 0 to 15 )" )
-        
-#        
-# Enable mute of radio       
-#        
-    elif( select == "3" ):
-        Mute = input( "Enter mute ( 1 for Mute, 0 for audio ) > " )
-        
-        if ( fm_radio.SetMute( Mute ) == True ):
-            fm_radio.ProgramRadio()
-        else:
-            print( "Invalid mute setting" )
-
-#
-# Display radio current settings
-#
-    elif( select == "4" ):
-        Settings = fm_radio.GetSettings()
-
-        print( Settings )
-        print("")
-        print("Radio Status")
-        print("")
-
-        print( "Mute: ", end="" )
-        if ( Settings[0] == True ):
-            print( "enabled" )
-        else:
-            print( "disabled" )
-
-        print( "Volume: %d" % Settings[1] )
-
-        print( "Frequency: %5.1f" % Settings[2] )
-
-        print( "Mode: ", end="" )
-        if ( Settings[3] == True ):
-            print( "stereo" )
-        else:
-            print( "mono" )
+fm_radio = Radio(101 + 9/10, 5, True)
+clock_tim.init(period = 60000, mode=Timer.PERIODIC, callback=periodic_increase)
+change_mode(1)
 
 
-    else:
-        print( "Invalid menu option" )
-
-        
-
+while True:
+    pass
 
